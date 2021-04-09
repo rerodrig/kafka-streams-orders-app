@@ -1,0 +1,62 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  cloud:
+    function:
+      # https://cloud.spring.io/spring-cloud-stream/reference/html/spring-cloud-stream.html#spring_cloud_function
+      definition: ordersConsumer;inventoryOrdersConsumer;inventoryReservationConsumer
+    stream:
+      default:
+        binder: kafka
+        contentType: application/json
+      kafka:
+        binder:
+          brokers:
+            - localhost:9092
+          auto-create-topics: true
+          consumer-properties:
+            auto.offset.reset: earliest
+          autoAddPartitions: true
+        bindings:
+          ordersConsumer-in-0:
+            consumer:
+              enableDlq: true
+              dlqName: orders-consumer-dlq
+      #rabbit:
+        #bindings:
+          #inventoryOrdersConsumer-out-0:
+            #producer:
+              #routingKeyExpression: 'orders-routing-key'
+      bindings:
+        ordersProducer-out-0:
+          binder: kafka
+          destination: orders-topic
+          producer:
+            partitionKeyExpression: payload.id
+            partitionCount: 2
+        ordersConsumer-in-0:
+          binder: kafka
+          destination: orders-topic
+          group: orders-consumer-group
+          consumer:
+            maxAttempts: 5
+            # show time difference in the logs
+            # https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_retry_template_and_retrybackoff
+        inventoryOrdersConsumer-in-0:
+          binder: kafka
+          destination: orders-topic
+          group: inventory-consumer-group
+        inventoryOrdersConsumer-out-0:
+          binder: rabbit
+          destination: orders-exchange
+          group: orders-queue
+        inventoryReservationConsumer-in-0:
+          binder: rabbit
+          destination: orders-exchange
+          group: orders-queue
+  rabbitmq:
+    host: localhost
+    post: 5672
+    username: guest
+    password: guest
+    virtual-host: kafka-streams-order-app
